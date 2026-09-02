@@ -236,9 +236,21 @@ body{
     <div id="view-teacher" style="display:none;">
       <div class="tabs">
         <div class="tab-btn on" onclick="showTeacherTab('attendance',this)">Attendance</div>
+        <div class="tab-btn" onclick="showTeacherTab('report',this)">Daily Report</div>
         <div class="tab-btn" onclick="showTeacherTab('inspection',this)">Inspection</div>
         <div class="tab-btn" onclick="showTeacherTab('board',this)">Boards & Notices</div>
         <div class="tab-btn" onclick="showTeacherTab('profile',this)">My Profile</div>
+      </div>
+      <div id="tt-report" class="tt-pane" style="display:none;">
+        <div class="card"><div class="card-hd">Submit Daily Report</div><div class="card-bd">
+          <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Record what happened in your class today — lessons covered, notable events, concerns, anything the school should know.</p>
+          <div class="fg"><label>Class</label><input id="rep-class" placeholder="e.g. Primary 4B" /></div>
+          <div class="fg"><label>Date</label><input id="rep-date" type="date" /></div>
+          <div class="fg"><label>Report</label><textarea id="rep-text" rows="6" placeholder="Today in class…"></textarea></div>
+          <button class="btn gold" onclick="submitDailyReport()">Submit Report</button>
+          <div id="rep-msg" style="margin-top:8px;font-size:12px;"></div>
+        </div></div>
+        <div class="card"><div class="card-hd">My Recent Reports</div><div class="card-bd" id="my-reports-list"><div class="loading-txt">Loading…</div></div></div>
       </div>
       <div id="tt-attendance" class="tt-pane">
         <div class="card"><div class="card-hd">Take Attendance</div><div class="card-bd">
@@ -282,6 +294,7 @@ body{
         <div class="tab-btn" onclick="showAdminTab('admissions',this)">Admissions</div>
         <div class="tab-btn" onclick="showAdminTab('exams',this)">Exam Timetable</div>
         <div class="tab-btn" onclick="showAdminTab('calendar',this)">School Calendar</div>
+        <div class="tab-btn" onclick="showAdminTab('activity',this)">Activity Log</div>
       </div>
       <div id="at-codes" class="at-pane">
         <div class="card"><div class="card-hd">Add Family (Parent Login Code)</div><div class="card-bd">
@@ -324,6 +337,7 @@ body{
             <div id="admin-roster-table"><div class="loading-txt">Loading…</div></div>
           </div>
         </div>
+        <div class="card"><div class="card-hd">Teacher Daily Reports</div><div class="card-bd" id="admin-daily-reports"><div class="loading-txt">Loading…</div></div></div>
       </div>
       <div id="at-notices" class="at-pane" style="display:none;">
         <div class="card"><div class="card-hd">Post a Notice</div><div class="card-bd">
@@ -412,15 +426,27 @@ body{
         <div class="card"><div class="card-hd">School Calendar</div><div class="card-bd" id="admin-calendar-list"><div class="loading-txt">Loading…</div></div></div>
         <div class="card"><div class="card-hd">Manage / Delete Events</div><div class="card-bd" id="admin-calendar-manage"><div class="loading-txt">Loading…</div></div></div>
       </div>
+      <div id="at-activity" class="at-pane" style="display:none;">
+        <div class="card"><div class="card-hd">Activity Log</div><div class="card-bd">
+          <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Every action taken in the portal — by you, virtual assistants, and teachers — is recorded here, newest first.</p>
+          <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <button class="btn sm" onclick="loadActivityLog()">Refresh</button>
+            <button class="btn sm" style="background:var(--red-bg);color:var(--red);" onclick="clearActivityLog()">Clear Log</button>
+          </div>
+          <div id="activity-log-list"><div class="loading-txt">Loading…</div></div>
+        </div></div>
+      </div>
     </div>
 
     <!-- ===== VIRTUAL ASSISTANT VIEW (no financial access) ===== -->
     <div id="view-assistant" style="display:none;">
       <div class="tabs">
         <div class="tab-btn on" onclick="showVaTab('roster',this)">Student Roster</div>
+        <div class="tab-btn" onclick="showVaTab('staff',this)">Staff</div>
         <div class="tab-btn" onclick="showVaTab('board',this)">Notice Board</div>
         <div class="tab-btn" onclick="showVaTab('exams',this)">Exam Timetable</div>
         <div class="tab-btn" onclick="showVaTab('calendar',this)">School Calendar</div>
+        <div class="tab-btn" onclick="openFeesPortal()">Fees Portal</div>
       </div>
       <div id="va-roster" class="va-pane">
         <div class="card">
@@ -430,6 +456,10 @@ body{
             <div id="va-roster-table"><div class="loading-txt">Loading…</div></div>
           </div>
         </div>
+      </div>
+      <div id="va-staff" class="va-pane" style="display:none;">
+        <div class="card"><div class="card-hd">Staff Directory</div><div class="card-bd" id="va-staff-list"><div class="loading-txt">Loading…</div></div></div>
+        <div class="card"><div class="card-hd">Teacher Bookings</div><div class="card-bd" id="va-staff-bookings"><div class="loading-txt">Loading…</div></div></div>
       </div>
       <div id="va-board" class="va-pane" style="display:none;">
         <div class="card"><div class="card-hd">📢 Notice Board</div><div class="card-bd" id="va-notice-board"></div></div>
@@ -495,6 +525,19 @@ async function sendAdmissionEmail(a){
 function sbHeaders(extra){return Object.assign({'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY},extra||{});}
 async function sbGet(path){var r=await fetch(SUPABASE_URL+'/rest/v1/'+path,{headers:sbHeaders()});if(!r.ok)throw new Error('GET '+path+' failed: '+r.status);return r.json();}
 async function sbPost(table,row){var r=await fetch(SUPABASE_URL+'/rest/v1/'+table,{method:'POST',headers:sbHeaders({'Prefer':'return=representation'}),body:JSON.stringify(row)});if(!r.ok){var t=await r.text();throw new Error('POST '+table+' failed: '+r.status+' '+t);}return r.json();}
+// Activity log: records who did what, across all roles. Fire-and-forget so a
+// logging hiccup never blocks the real action.
+function actorLabel(){
+  if(!session)return 'Unknown';
+  if(session.role==='admin')return (session.adminName||'Admin')+' (Admin)';
+  if(session.role==='assistant')return (session.assistantName||'Assistant')+' (Virtual Assistant)';
+  if(session.role==='teacher')return (session.teacherName||'Teacher')+' (Teacher)';
+  if(session.role==='parent')return (session.parentName||session.code||'Parent')+' (Parent)';
+  return 'Unknown';
+}
+async function logActivity(action,detail){
+  try{await sbPost('activity_log',{actor:actorLabel(),role:session?session.role:'unknown',action:action,detail:detail||''});}catch(e){}
+}
 async function sbPatch(table,filter,row){var r=await fetch(SUPABASE_URL+'/rest/v1/'+table+'?'+filter,{method:'PATCH',headers:sbHeaders({'Prefer':'return=representation'}),body:JSON.stringify(row)});if(!r.ok){var t=await r.text();throw new Error('PATCH '+table+' failed: '+r.status+' '+t);}return r.json();}
 async function sbDelete(table,filter){var r=await fetch(SUPABASE_URL+'/rest/v1/'+table+'?'+filter,{method:'DELETE',headers:sbHeaders()});if(!r.ok){var t=await r.text();throw new Error('DELETE '+table+' failed: '+r.status+' '+t);}}
 async function sbUploadPhoto(file,keyHint){
@@ -688,7 +731,7 @@ function initParent(){
 }
 // Optional add-ons: chosen PER CHILD. Each child gets their own checkboxes;
 // submitting saves one request per child and emails the school office.
-var ADDONS=[{k:'feeding',l:'School Feeding (per term)',a:300000},{k:'one2one',l:'One on One (per term)',a:150000},{k:'arabic',l:'Arabic Classes',a:30000},{k:'islamiyah',l:'Islamiyah After-School (4\u20136 pm)',a:40000}];
+var ADDONS=[{k:'feeding',l:'School Feeding (per term)',a:300000},{k:'one2one',l:'One on One (per term)',a:150000},{k:'arabic',l:'Arabic Classes',a:30000},{k:'islamiyah',l:'Islamiyah After-School (4\u20136 pm)',a:40000},{k:'sportwear',l:'Sport Wear (Trouser/Skirt)',a:30000},{k:'sportshirt',l:'Sport Shirt (Polo)',a:11500}];
 var _addonBase=0;
 var _addonKids=[];
 function loadAddons(kids){
@@ -860,6 +903,8 @@ async function loadInspections(kids){
 function initTeacher(){
   document.getElementById('att-date').value=new Date().toISOString().slice(0,10);
   document.getElementById('ins-date').value=new Date().toISOString().slice(0,10);
+  var rd=document.getElementById('rep-date');if(rd)rd.value=new Date().toISOString().slice(0,10);
+  loadMyReports();
   loadFlags('att-flags');
   renderTeacherLeaderboard('t-teacher-lb');
   renderStudentLeaderboard('t-student-lb');
@@ -867,6 +912,30 @@ function initTeacher(){
   renderNoticeBoard('t-notice-board','teachers');
   loadReadOnlyCalendar('t-calendar-list',null,'teachers');
   loadProfile();
+}
+async function submitDailyReport(){
+  var cls=document.getElementById('rep-class').value.trim();
+  var date=document.getElementById('rep-date').value;
+  var text=document.getElementById('rep-text').value.trim();
+  var msg=document.getElementById('rep-msg');
+  if(!text){msg.style.color='var(--red)';msg.textContent='Please write your report first.';return;}
+  if(!date)date=new Date().toISOString().slice(0,10);
+  try{
+    await sbPost('daily_reports',{teacher_id:session.teacherId,teacher_name:session.teacherName,class_arm:cls,date:date,report:text});
+    logActivity('Submitted daily report',(cls||'')+' \u00b7 '+date);
+    msg.style.color='var(--green)';msg.textContent='Report submitted. Thank you.';
+    document.getElementById('rep-text').value='';
+    loadMyReports();
+  }catch(e){msg.style.color='var(--red)';msg.textContent='Could not submit: '+e.message;}
+}
+async function loadMyReports(){
+  var el=document.getElementById('my-reports-list');if(!el)return;
+  try{
+    var rows=await sbGet('daily_reports?teacher_id=eq.'+session.teacherId+'&order=date.desc&limit=20');
+    el.innerHTML=rows.length?rows.map(function(r){
+      return '<div class="notice-card"><div class="notice-title">'+esc(r.date)+(r.class_arm?' \u00b7 '+esc(r.class_arm):'')+'</div><div class="notice-body">'+esc(r.report)+'</div></div>';
+    }).join(''):'<div class="empty-txt">No reports yet.</div>';
+  }catch(e){el.innerHTML='<div class="empty-txt">Could not load reports.</div>';}
 }
 function showTeacherTab(name,btn){
   document.querySelectorAll('.tt-pane').forEach(function(p){p.style.display='none';});
@@ -976,6 +1045,31 @@ function initAdmin(){
   loadAdminFlags();loadAdminInspections();loadTermState();loadRoster();
   loadAdmissions();loadAdminExamList();loadAdminCalendar();loadAddonRequests();
   loadManageFamilies();loadManageTeachers();loadManageAssistants();
+  loadActivityLog();loadAdminDailyReports();
+  logActivity('Signed in','Admin portal');
+}
+async function loadActivityLog(){
+  var el=document.getElementById('activity-log-list');if(!el)return;
+  try{
+    var rows=await sbGet('activity_log?order=created_at.desc&limit=200');
+    el.innerHTML=rows.length?rows.map(function(r){
+      var when=new Date(r.created_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+      return '<div class="flag-row"><div class="lb-info"><div class="lb-name">'+esc(r.action)+(r.detail?' \u2014 <span style="font-weight:400;">'+esc(r.detail)+'</span>':'')+'</div><div class="lb-sub">'+esc(r.actor||'')+' \u00b7 '+when+'</div></div></div>';
+    }).join(''):'<div class="empty-txt">No activity recorded yet.</div>';
+  }catch(e){el.innerHTML='<div class="empty-txt">Could not load activity log.</div>';}
+}
+async function clearActivityLog(){
+  if(!confirm('Clear the entire activity log? This cannot be undone.'))return;
+  try{await sbDelete('activity_log','id=gt.00000000-0000-0000-0000-000000000000');loadActivityLog();}catch(e){alert('Could not clear: '+e.message);}
+}
+async function loadAdminDailyReports(){
+  var el=document.getElementById('admin-daily-reports');if(!el)return;
+  try{
+    var rows=await sbGet('daily_reports?order=date.desc&limit=100');
+    el.innerHTML=rows.length?rows.map(function(r){
+      return '<div class="notice-card"><div class="notice-title">'+esc(r.teacher_name||'Teacher')+' \u00b7 '+esc(r.date)+(r.class_arm?' \u00b7 '+esc(r.class_arm):'')+'</div><div class="notice-body">'+esc(r.report)+'</div></div>';
+    }).join(''):'<div class="empty-txt">No daily reports yet.</div>';
+  }catch(e){el.innerHTML='<div class="empty-txt">Could not load reports.</div>';}
 }
 function showAdminTab(name,btn){
   document.querySelectorAll('.at-pane').forEach(function(p){p.style.display='none';});
@@ -984,17 +1078,34 @@ function showAdminTab(name,btn){
   btn.classList.add('on');
 }
 async function addFamily(){
-  var code=document.getElementById('fam-code').value.trim(),name=document.getElementById('fam-name').value.trim(),phone=document.getElementById('fam-phone').value.trim();
+  var code=document.getElementById('fam-code').value.trim().toUpperCase(),name=document.getElementById('fam-name').value.trim(),phone=document.getElementById('fam-phone').value.trim();
   var photoFile=document.getElementById('fam-photo').files[0];
   if(!code){alert('Enter a family code.');return;}
   try{
+    // Case-insensitive duplicate check first, so we give a clear message
+    // instead of a raw database error.
+    var existing=await sbGet('families?code=ilike.'+encodeURIComponent(code)+'&select=id,code,parent_name');
+    if(existing.length){
+      var ex=existing[0];
+      if(confirm('A family with code '+ex.code+' already exists'+(ex.parent_name?' ('+ex.parent_name+')':'')+'.\n\nDo you want to UPDATE that family\u2019s name/phone instead?')){
+        var photoUrl2=null;
+        if(photoFile)photoUrl2=await sbUploadPhoto(photoFile,'family-'+code);
+        var patch={parent_name:name,phone:phone};
+        if(photoUrl2)patch.photo_url=photoUrl2;
+        await sbPatch('families','id=eq.'+ex.id,patch);
+        alert('Family '+ex.code+' updated.');
+        document.getElementById('fam-code').value='';document.getElementById('fam-name').value='';document.getElementById('fam-phone').value='';document.getElementById('fam-photo').value='';
+        loadManageFamilies();
+      }
+      return;
+    }
     var photoUrl=null;
     if(photoFile)photoUrl=await sbUploadPhoto(photoFile,'family-'+code);
     await sbPost('families',{code:code,parent_name:name,phone:phone,photo_url:photoUrl});
-    alert('Family added. They can now log in with code: '+code);
+    alert('Family added. They can now log in with code: '+code);logActivity('Added family',code+' — '+name);
     document.getElementById('fam-code').value='';document.getElementById('fam-name').value='';document.getElementById('fam-phone').value='';document.getElementById('fam-photo').value='';
     loadManageFamilies();
-  }catch(e){alert('Could not add family (code may already exist): '+e.message);}
+  }catch(e){alert('Could not add family: '+e.message);}
 }
 async function addStudent(){
   var fcode=document.getElementById('stu-fcode').value.trim(),name=document.getElementById('stu-name').value.trim(),level=document.getElementById('stu-level').value,cls=document.getElementById('stu-class').value.trim(),reg=document.getElementById('stu-reg').value.trim();
@@ -1014,7 +1125,7 @@ async function addTeacher(){
     var photoUrl=null;
     if(photoFile)photoUrl=await sbUploadPhoto(photoFile,'teacher-'+code);
     await sbPost('teachers',{code:code,name:name,subject:subject,class_arm:cls,photo_url:photoUrl});
-    alert('Teacher added. They can log in with code: '+code);
+    alert('Teacher added. They can log in with code: '+code);logActivity('Added teacher',name+' ('+code+')');
     document.getElementById('tch-code').value='';document.getElementById('tch-name-add').value='';document.getElementById('tch-subject').value='';document.getElementById('tch-class').value='';document.getElementById('tch-photo').value='';
     loadManageTeachers();
   }catch(e){alert('Could not add teacher (code may already exist): '+e.message);}
@@ -1033,7 +1144,20 @@ async function loadManageFamilies(){
 }
 async function deleteFamily(id){
   if(!confirm('Delete this family? This also deletes all of their children on file. This cannot be undone.'))return;
-  try{await sbDelete('families','id=eq.'+id);loadManageFamilies();loadRoster();}catch(e){alert('Could not delete: '+e.message);}
+  try{
+    await sbDelete('families','id=eq.'+id);
+    logActivity('Deleted family',id);
+    loadManageFamilies();loadRoster();
+  }catch(e){
+    var m=e.message||'';
+    if(m.indexOf('foreign key')>=0||m.indexOf('violates')>=0){
+      alert('This family still has invoices or requests linked to it. Delete those first (in the Fees register / add-on requests), then try again.');
+    }else if(m.indexOf('403')>=0||m.indexOf('42501')>=0||m.indexOf('permission')>=0){
+      alert('The database is not permitting deletes yet. Run the schema_fix_deletes.sql file in Supabase, then try again.');
+    }else{
+      alert('Could not delete: '+m);
+    }
+  }
 }
 async function loadManageTeachers(){
   var el=document.getElementById('manage-teachers-list');
@@ -1048,7 +1172,7 @@ async function loadManageTeachers(){
 }
 async function deleteTeacher(id){
   if(!confirm('Delete this teacher? This cannot be undone.'))return;
-  try{await sbDelete('teachers','id=eq.'+id);loadManageTeachers();}catch(e){alert('Could not delete: '+e.message);}
+  try{await sbDelete('teachers','id=eq.'+id);loadManageTeachers();logActivity('Deleted teacher',id);}catch(e){alert('Could not delete: '+e.message);}
 }
 async function loadManageAssistants(){
   var el=document.getElementById('manage-assistants-list');
@@ -1153,19 +1277,41 @@ async function saveTermState(){
 // ============================================================
 // STUDENT ROSTER (shared table renderer — used by Admin & Virtual Assistant)
 // ============================================================
-function renderRosterTable(students,targetId,editable){
+function renderRosterTable(students,targetId,opts){
+  opts=opts||{};var canDelete=opts.del,canEdit=opts.edit,onDone=opts.onDone||'loadRoster';
   var el=document.getElementById(targetId);
   if(!students.length){el.innerHTML='<div class="empty-txt">No students found.</div>';return;}
+  window._rosterCache=window._rosterCache||{};
+  students.forEach(function(s){window._rosterCache[s.id]=s;});
   var rows=students.map(function(s){
     var fam=s.families||{};
-    var delCell=editable?'<td><button class="btn sm" style="background:var(--red-bg);color:var(--red);" onclick="deleteStudent(\''+s.id+'\')">Delete</button></td>':'';
-    return '<tr><td>'+esc(s.name)+'</td><td>'+esc(s.class_arm||s.level||'')+'</td><td>'+esc(fam.parent_name||'\u2014')+'</td><td>'+esc(fam.phone||'\u2014')+'</td><td>'+esc(fam.code||'\u2014')+'</td>'+delCell+'</tr>';
+    var actions='';
+    if(canEdit)actions+='<button class="btn sm" style="background:var(--off);color:var(--navy);border:1.5px solid var(--border);" onclick="openStudentEdit(\''+s.id+'\',\''+onDone+'\')">Edit</button> ';
+    if(canDelete)actions+='<button class="btn sm" style="background:var(--red-bg);color:var(--red);" onclick="deleteStudent(\''+s.id+'\')">Delete</button>';
+    var actCell=(canEdit||canDelete)?'<td style="white-space:nowrap;">'+actions+'</td>':'';
+    return '<tr><td>'+esc(s.name)+'</td><td>'+esc(s.class_arm||s.level||'')+'</td><td>'+esc(fam.parent_name||'\u2014')+'</td><td>'+esc(fam.phone||'\u2014')+'</td><td>'+esc(fam.code||'\u2014')+'</td>'+actCell+'</tr>';
   }).join('');
-  el.innerHTML='<table class="simple"><tr><th>Student</th><th>Class</th><th>Parent</th><th>Phone</th><th>Family Code</th>'+(editable?'<th></th>':'')+'</tr>'+rows+'</table>';
+  el.innerHTML='<table class="simple"><tr><th>Student</th><th>Class</th><th>Parent</th><th>Phone</th><th>Family Code</th>'+((canEdit||canDelete)?'<th></th>':'')+'</tr>'+rows+'</table>';
+}
+function openStudentEdit(id,onDone){
+  var s=(window._rosterCache||{})[id];if(!s)return;
+  var name=prompt('Student full name:',s.name||'');if(name===null)return;
+  var cls=prompt('Class (e.g. Primary 4B):',s.class_arm||'');if(cls===null)return;
+  var level=prompt('Level (creche / nursery / primary / js3):',s.level||'');if(level===null)return;
+  var reg=prompt('Reg number (optional):',s.reg_no||'');if(reg===null)return;
+  saveStudentEdit(id,{name:name.trim(),class_arm:cls.trim(),level:level.trim(),reg_no:reg.trim()},onDone,s.name);
+}
+async function saveStudentEdit(id,patch,onDone,prevName){
+  try{
+    await sbPatch('students','id=eq.'+id,patch);
+    logActivity('Edited student',(prevName||'')+' \u2192 '+patch.name+' ('+patch.class_arm+')');
+    if(typeof window[onDone]==='function')window[onDone]();
+  }catch(e){alert('Could not save: '+e.message);}
 }
 async function deleteStudent(id){
   if(!confirm('Delete this student? This cannot be undone.'))return;
-  try{await sbDelete('students','id=eq.'+id);loadRoster();}catch(e){alert('Could not delete: '+e.message);}
+  var s=(window._rosterCache||{})[id];
+  try{await sbDelete('students','id=eq.'+id);logActivity('Deleted student',s?s.name:id);loadRoster();}catch(e){alert('Could not delete: '+e.message);}
 }
 async function loadRoster(){
   var filter=document.getElementById('roster-filter').value.trim();
@@ -1175,7 +1321,7 @@ async function loadRoster(){
     var q='students?select=*,families(code,parent_name,phone)&order=class_arm.asc,name.asc';
     if(filter)q+='&class_arm=ilike.*'+encodeURIComponent(filter)+'*';
     var rows=await sbGet(q);
-    renderRosterTable(rows,'admin-roster-table',true);
+    renderRosterTable(rows,'admin-roster-table',{del:true,edit:true,onDone:'loadRoster'});
   }catch(e){el.innerHTML='<div class="empty-txt">Could not load roster.</div>';}
 }
 
@@ -1187,6 +1333,22 @@ function initAssistant(){
   renderNoticeBoard('va-notice-board','all');
   loadVaExamList();
   loadVaCalendar();
+  loadVaStaff();
+  logActivity('Signed in','Virtual Assistant portal');
+}
+async function loadVaStaff(){
+  var sEl=document.getElementById('va-staff-list'),bEl=document.getElementById('va-staff-bookings');
+  try{
+    var teachers=await sbGet('teachers?order=name.asc');
+    sEl.innerHTML=teachers.length?teachers.map(function(t){
+      return '<div class="lb-row"><div class="lb-info"><div class="lb-name">'+esc(t.name)+'</div><div class="lb-sub">'+esc(t.subject||'')+(t.class_arm?' \u00b7 '+esc(t.class_arm):'')+'</div></div></div>';
+    }).join(''):'<div class="empty-txt">No staff on file.</div>';
+    var bookings=await sbGet('bookings?select=*,teachers(name)&order=date.asc');
+    bEl.innerHTML=bookings.length?bookings.map(function(b){
+      var tn=(b.teachers&&b.teachers.name)||'';
+      return '<div class="lb-row"><div class="lb-info"><div class="lb-name">'+esc(b.title||'Booking')+'</div><div class="lb-sub">'+esc(tn)+' \u00b7 '+esc(b.date||'')+' '+esc(b.time||'')+(b.note?' \u00b7 '+esc(b.note):'')+'</div></div></div>';
+    }).join(''):'<div class="empty-txt">No bookings.</div>';
+  }catch(e){sEl.innerHTML='<div class="empty-txt">Could not load staff.</div>';}
 }
 async function loadVaExamList(){
   var el=document.getElementById('va-exam-list');
@@ -1216,7 +1378,7 @@ async function loadVaRoster(){
     var q='students?select=*,families(code,parent_name,phone)&order=class_arm.asc,name.asc';
     if(filter)q+='&class_arm=ilike.*'+encodeURIComponent(filter)+'*';
     var rows=await sbGet(q);
-    renderRosterTable(rows,'va-roster-table');
+    renderRosterTable(rows,'va-roster-table',{edit:true,onDone:'loadVaRoster'});
   }catch(e){el.innerHTML='<div class="empty-txt">Could not load roster.</div>';}
 }
 async function addAssistant(){
@@ -1224,7 +1386,7 @@ async function addAssistant(){
   if(!code||!name){alert('Code and name are required.');return;}
   try{
     await sbPost('assistants',{code:code,name:name});
-    alert('Virtual Assistant added. They can log in with code: '+code);
+    alert('Virtual Assistant added. They can log in with code: '+code);logActivity('Added virtual assistant',name+' ('+code+')');
     document.getElementById('va-code').value='';document.getElementById('va-name').value='';
     loadManageAssistants();
   }catch(e){alert('Could not add (code may already exist): '+e.message);}
@@ -1251,7 +1413,7 @@ async function loadAddonRequests(){
   try{
     var rows=await sbGet('addon_requests?order=created_at.desc&limit=100');
     if(!rows.length){el.innerHTML='<div class="empty-txt">No add-on requests yet.</div>';return;}
-    var names={feeding:'School Feeding',one2one:'One on One',arabic:'Arabic Classes',islamiyah:'Islamiyah After-School'};
+    var names={feeding:'School Feeding',one2one:'One on One',arabic:'Arabic Classes',islamiyah:'Islamiyah After-School',sportwear:'Sport Wear (Trouser/Skirt)',sportshirt:'Sport Shirt (Polo)'};
     el.innerHTML=rows.map(function(r){
       var list=(r.addons||[]).map(function(k){return names[k]||k;}).join(', ');
       return '<div class="flag-row"><div class="lb-info"><div class="lb-name">'+esc(r.family_code)+(r.child_name?' \u2014 '+esc(r.child_name):'')+(r.status==='pending'?' <span class="flag-badge">new</span>':'')+'</div><div class="lb-sub">'+esc(list)+' \u00b7 '+fmtN(r.addons_total||0)+' \u00b7 '+new Date(r.created_at).toLocaleDateString('en-GB')+'</div></div>'
@@ -1261,7 +1423,7 @@ async function loadAddonRequests(){
   }catch(e){el.innerHTML='<div class="empty-txt">Could not load requests.</div>';}
 }
 async function ackAddonRequest(id){
-  try{await sbPatch('addon_requests','id=eq.'+id,{status:'acknowledged'});loadAddonRequests();}catch(e){alert('Could not update: '+e.message);}
+  try{await sbPatch('addon_requests','id=eq.'+id,{status:'acknowledged'});logActivity('Acknowledged add-on request',id);loadAddonRequests();}catch(e){alert('Could not update: '+e.message);}
 }
 async function deleteAddonRequest(id){
   if(!confirm('Delete this add-on request?'))return;
@@ -1291,6 +1453,7 @@ async function addExamEntry(){
     alert('Added to timetable.');
     document.getElementById('ex-subject').value='';document.getElementById('ex-date').value='';document.getElementById('ex-time').value='';
     loadAdminExamList();
+    logActivity('Added exam entry',subject+' — '+cls);
   }catch(e){alert('Could not add: '+e.message);}
 }
 async function addExamEntryVA(){
@@ -1305,6 +1468,7 @@ async function addExamEntryVA(){
     await sbPost('exam_timetable',{class_arm:cls,subject:subject,date:date||null,time:time,term:term,year:year});
     alert('Added to timetable.');
     document.getElementById('va-ex-subject').value='';document.getElementById('va-ex-date').value='';document.getElementById('va-ex-time').value='';
+    logActivity('Added exam entry',subject+' — '+cls);
     loadVaExamList();
   }catch(e){alert('Could not add: '+e.message);}
 }
@@ -1340,7 +1504,7 @@ async function addCalendarEvent(){
   if(!title){alert('Enter an event title.');return;}
   try{
     await sbPost('school_calendar',{title:title,date:date||null,time:time,description:desc,audience:aud});
-    alert('Added to calendar.');
+    alert('Added to calendar.');logActivity('Added calendar event',title);
     document.getElementById('cal-title').value='';document.getElementById('cal-date').value='';document.getElementById('cal-time').value='';document.getElementById('cal-desc').value='';
     loadAdminCalendar();
   }catch(e){alert('Could not add: '+e.message);}
