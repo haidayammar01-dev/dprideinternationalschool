@@ -151,21 +151,36 @@ body{
     <div class="back-link" style="margin-top:10px;" onclick="openAdmissionsForm()">New family? Apply for admission →</div>
   </div>
 
-  <div id="admissions-modal" style="display:none;position:fixed;inset:0;background:rgba(15,35,71,0.7);z-index:200;align-items:center;justify-content:center;padding:20px;">
-    <div class="login-card" style="max-width:440px;text-align:left;">
-      <div class="login-title" style="text-align:center;">Apply for Admission</div>
-      <div class="login-sub" style="text-align:center;">Tell us about your child — we'll be in touch shortly.</div>
-      <div class="fg"><label>Child's Full Name</label><input id="adm-name" /></div>
-      <div class="fg"><label>Date of Birth</label><input id="adm-dob" type="date" /></div>
-      <div class="fg"><label>Level Applying For</label>
-        <select id="adm-level"><option value="creche">Crèche</option><option value="nursery">Nursery</option><option value="primary">Primary</option></select>
+  <div id="admissions-modal" style="display:none;position:fixed;inset:0;background:rgba(15,35,71,0.7);z-index:200;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
+    <div class="login-card" style="max-width:480px;text-align:left;max-height:92vh;overflow-y:auto;">
+      <div class="login-title" style="text-align:center;">Admission / Enrolment Form</div>
+      <div class="login-sub" style="text-align:center;">Please complete this form for your child. The school office will review it and contact you about the next steps.</div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin:14px 0 8px;padding-bottom:5px;border-bottom:2px solid var(--gold);">Child's Details</div>
+      <div class="fg"><label>Child's Full Name *</label><input id="adm-name" /></div>
+      <div class="fg"><label>Date of Birth *</label><input id="adm-dob" type="date" /></div>
+      <div class="fg"><label>Gender</label><select id="adm-gender"><option value="">Select…</option><option>Female</option><option>Male</option></select></div>
+      <div class="fg"><label>Level Applying For *</label>
+        <select id="adm-level"><option value="creche">Crèche / Daycare</option><option value="nursery">Nursery</option><option value="primary">Primary</option></select>
       </div>
-      <div class="fg"><label>Parent / Guardian Name</label><input id="adm-parent" /></div>
-      <div class="fg"><label>Phone</label><input id="adm-phone" /></div>
+      <div class="fg"><label>Preferred Resumption Term</label><select id="adm-term"><option value="">No preference</option><option>First Term</option><option>Second Term</option><option>Third Term</option></select></div>
+      <div class="fg"><label>Previous School (if any)</label><input id="adm-prevschool" placeholder="Leave blank if none" /></div>
+      <div class="fg"><label>Any medical conditions or allergies we should know?</label><textarea id="adm-medical" rows="2" placeholder="e.g. asthma, food allergies — or write 'None'"></textarea></div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px;padding-bottom:5px;border-bottom:2px solid var(--gold);">Parent / Guardian</div>
+      <div class="fg"><label>Parent / Guardian Name *</label><input id="adm-parent" /></div>
+      <div class="fg"><label>Relationship to Child</label><select id="adm-relationship"><option value="">Select…</option><option>Mother</option><option>Father</option><option>Guardian</option><option>Other</option></select></div>
+      <div class="fg"><label>Phone Number *</label><input id="adm-phone" placeholder="e.g. 0803…" /></div>
       <div class="fg"><label>Email (optional)</label><input id="adm-email" /></div>
-      <div class="fg"><label>Anything else we should know?</label><textarea id="adm-notes" rows="3"></textarea></div>
+      <div class="fg"><label>Area / Neighbourhood</label><input id="adm-area" placeholder="e.g. Garki 2 — no need for full address" /></div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px;padding-bottom:5px;border-bottom:2px solid var(--gold);">A Little More</div>
+      <div class="fg"><label>How did you hear about Dpride?</label><select id="adm-source"><option value="">Select…</option><option>Referral / Word of mouth</option><option>Social media</option><option>Passed by the school</option><option>Flyer / Advert</option><option>Other</option></select></div>
+      <div class="fg"><label>Questions or anything else you'd like us to know?</label><textarea id="adm-notes" rows="3"></textarea></div>
+
+      <p style="font-size:11px;color:var(--muted);margin:4px 0 12px;">🔒 For your security, please do not enter any financial, bank, or payment details on this form. We will never ask for those here.</p>
       <div id="adm-msg" style="font-size:12px;color:var(--green);margin-bottom:10px;"></div>
-      <button class="btn gold" style="width:100%;" onclick="submitAdmission()">Submit Application</button>
+      <button class="btn gold" style="width:100%;" onclick="submitAdmission()">Submit Enrolment Form</button>
       <div class="back-link" style="text-align:center;margin-top:10px;" onclick="closeAdmissionsForm()">← Back to login</div>
     </div>
   </div>
@@ -575,20 +590,38 @@ function closeAdmissionsForm(){document.getElementById('admissions-modal').style
 async function submitAdmission(){
   var name=document.getElementById('adm-name').value.trim();
   var dob=document.getElementById('adm-dob').value;
+  var gender=document.getElementById('adm-gender').value;
   var level=document.getElementById('adm-level').value;
+  var pterm=document.getElementById('adm-term').value;
+  var prevschool=document.getElementById('adm-prevschool').value.trim();
+  var medical=document.getElementById('adm-medical').value.trim();
   var parent=document.getElementById('adm-parent').value.trim();
+  var relationship=document.getElementById('adm-relationship').value;
   var phone=document.getElementById('adm-phone').value.trim();
   var email=document.getElementById('adm-email').value.trim();
-  var notes=document.getElementById('adm-notes').value.trim();
+  var area=document.getElementById('adm-area').value.trim();
+  var source=document.getElementById('adm-source').value;
+  var extra=document.getElementById('adm-notes').value.trim();
   var msg=document.getElementById('adm-msg');
-  if(!name||!parent||!phone){msg.style.color='var(--red)';msg.textContent='Please fill in the child\u2019s name, parent name, and phone.';return;}
+  if(!name||!parent||!phone||!dob||!level){msg.style.color='var(--red)';msg.textContent='Please fill in the required fields marked with *.';return;}
+  // Bundle the richer detail into notes so it all appears in the Admissions tab
+  var noteParts=[];
+  if(gender)noteParts.push('Gender: '+gender);
+  if(relationship)noteParts.push('Parent is '+relationship);
+  if(area)noteParts.push('Area: '+area);
+  if(pterm)noteParts.push('Preferred start: '+pterm);
+  if(prevschool)noteParts.push('Previous school: '+prevschool);
+  if(medical)noteParts.push('Medical/allergies: '+medical);
+  if(source)noteParts.push('Heard via: '+source);
+  if(extra)noteParts.push('Notes: '+extra);
+  var fullNotes=noteParts.join(' \u00b7 ');
   try{
-    var admRec={applicant_name:name,dob:dob||null,level_applying:level,parent_name:parent,phone:phone,email:email,notes:notes};
+    var admRec={applicant_name:name,dob:dob||null,level_applying:level,parent_name:parent,phone:phone,email:email,notes:fullNotes};
     await sbPost('admissions',admRec);
-    sendAdmissionEmail(admRec);
     msg.style.color='var(--green)';
-    msg.textContent='Thank you! Your application has been received \u2014 the school office will contact you soon.';
-    document.getElementById('adm-name').value='';document.getElementById('adm-parent').value='';document.getElementById('adm-phone').value='';document.getElementById('adm-email').value='';document.getElementById('adm-notes').value='';
+    msg.textContent='Thank you! Your enrolment form has been received \u2014 the school office will contact you soon.';
+    ['adm-name','adm-parent','adm-phone','adm-email','adm-prevschool','adm-medical','adm-area','adm-notes'].forEach(function(id){document.getElementById(id).value='';});
+    document.getElementById('adm-dob').value='';
   }catch(e){msg.style.color='var(--red)';msg.textContent='Could not submit right now \u2014 please try again.';}
 }
 async function tryLogin(){
